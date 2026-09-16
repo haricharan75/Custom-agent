@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 import anthropic
@@ -9,16 +10,20 @@ load_dotenv()
 
 
 def review_code(file_path):
-    """Review a Python file using Claude."""
+    """Review and safely fix a Python file using Claude."""
 
-    code = Path(file_path).read_text(encoding="utf-8")
+    path = Path(file_path)
+
+    if not path.exists():
+        print(f"File not found: {file_path}")
+        return
+
+    original_code = path.read_text(encoding="utf-8")
 
     prompt = f"""
 You are a Python Code Review Agent.
 
-Review the following Python code.
-
-Look for ONLY these basic issues:
+Review the following Python code and look ONLY for these basic issues:
 
 - Unused imports
 - Unused variables
@@ -32,39 +37,17 @@ Rules:
 1. Keep the existing functionality unchanged.
 2. Make only safe improvements.
 3. Do not add new functionality.
-4. Return the review summary and corrected code.
+4. Do not remove functionality.
+5. Return a short review summary.
+6. Return the complete corrected Python code.
+7. If no changes are required, return the original code unchanged.
 
 Use exactly this format:
 
 ## Review Summary
-- Issue 1:
-- Issue 2:
+- Issue 1: <issue>
+- Issue 2: <issue>
 
 ## Fixed Code
-<corrected Python code>
-
-<python_code>
-{code}
-</python_code>
-"""
-
-    client = anthropic.Anthropic(
-        api_key=os.environ["ANTHROPIC_API_KEY"]
-    )
-
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-    )
-
-    print(response.content[0].text)
-
-
-if __name__ == "__main__":
-    review_code("calculator.py")
+```python
+<complete corrected Python code>
